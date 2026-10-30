@@ -26,6 +26,9 @@ spec:
     spec:
       securityContext:
         fsGroup: 999
+      volumes:
+        - name: postgres-storage
+          emptyDir: {}
       containers:
         - name: postgresql
           image: postgres:16-alpine
@@ -51,20 +54,11 @@ spec:
               value: /var/lib/postgresql/data/pgdata
           resources:
             requests:
-              cpu: "100m"
-              memory: "256Mi"
+              cpu: "50m"
+              memory: "128Mi"
             limits:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: "300m"
+              memory: "256Mi"
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
-    - metadata:
-        name: postgres-storage
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: {{ .Values.global.storageClass }}
-        resources:
-          requests:
-            storage: {{ .Values.database.storageSize }}
