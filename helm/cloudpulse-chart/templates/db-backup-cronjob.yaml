@@ -1,0 +1,91 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgresql-s3-disaster-recovery
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: order-service
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            fsGroup: 10001
+          volumes:
+            - name: backup-staging
+              emptyDir: {}
+          initContainers:
+            - name: pg-dump-creator
+              image: postgres:16-alpine
+              env:
+                - name: PGHOST
+                  value: "postgresql"
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpulse-app-secrets
+                      key: POSTGRES_USER
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpulse-app-secrets
+                      key: POSTGRES_PASSWORD
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpulse-app-secrets
+                      key: POSTGRES_DB
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+                  echo "${TIMESTAMP}" > /backup/latest_timestamp.txt
+                  pg_dump -h "${PGHOST}" -U "${PGUSER}" -d "${PGDATABASE}" \vert{} gzip > "/backup/cloudpulsedb_${TIMESTAMP}.sql.gz"
+                  ls -lh /backup/
+              volumeMounts:
+                - name: backup-staging
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "256Mi"
+          containers:
+            - name: s3-encrypted-uploader
+              image: amazon/aws-cli:2.17.0
+              envFrom:
+                - secretRef:
+                    name: aws-ecr-iam-creds
+              env:
+                - name: S3_BUCKET
+                  value: {{ .Values.backup.s3BucketName | quote }}
+                - name: HOME
+                  value: "/tmp"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  TIMESTAMP=$(cat /backup/latest_timestamp.txt)
+                  FILE_NAME="cloudpulsedb_${TIMESTAMP}.sql.gz"
+                  aws s3 cp "/backup/${FILE_NAME}" "s3://${S3_BUCKET}/postgres-backups/${FILE_NAME}" --sse AES256
+                  echo "Backup successfully uploaded to s3://${S3_BUCKET}/postgres-backups/${FILE_NAME}"
+              volumeMounts:
+                - name: backup-staging
+                  mountPath: /backup
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "200m"
+                  memory: "256Mi"

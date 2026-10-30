@@ -7,16 +7,16 @@ global:
 
 authGateway:
   tag: "v1.0.7"
-  replicas: 2
+  replicas: 1
 
 catalogService:
   tag: "v1.0.7"
-  replicas: 2
+  replicas: 1
 
 orderService:
   tag: "v1.0.7"
   versionLabel: "v1.0.7-canary"
-  replicas: 2
+  replicas: 1
 
 notificationWorker:
   tag: "v1.0.7"
@@ -24,7 +24,11 @@ notificationWorker:
 
 frontendUi:
   tag: "v1.0.7"
-  replicas: 2
+  replicas: 1
 
 database:
   storageSize: "2Gi"
+
+backup:
+  s3BucketName: "cloudpulse-enterprise-backups-bf83ff9b"
+  schedule: "0 2 * * *"

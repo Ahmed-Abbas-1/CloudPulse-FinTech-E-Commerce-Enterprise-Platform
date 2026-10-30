@@ -1,0 +1,49 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloudpulse-microservices-monitor
+  labels:
+    app: cloudpulse
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - auth-gateway
+          - catalog-service
+          - order-service
+  namespaceSelector:
+    matchNames:
+      - cloudpulse-prod
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudpulse-enterprise-alerts
+  labels:
+    app: cloudpulse
+spec:
+  groups:
+    - name: cloudpulse.production.rules
+      rules:
+        - alert: CloudPulseOrderServiceErrors
+          expr: rate(cloudpulse_orders_created_total{status="error"}[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High failure rate in CloudPulse Order Service"
+            description: "Order Service is failing to process financial transactions in namespace cloudpulse-prod."
+        - alert: CloudPulsePodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="cloudpulse-prod"}[10m]) * 60 > 2
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Microservice Pod is CrashLooping in cloudpulse-prod"
+            description: "A container in cloudpulse-prod has restarted more than twice in the last 10 minutes."
