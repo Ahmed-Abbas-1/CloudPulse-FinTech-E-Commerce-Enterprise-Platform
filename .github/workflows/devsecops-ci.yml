@@ -60,7 +60,7 @@ jobs:
           helm template cloudpulse ./helm/cloudpulse-chart > /tmp/rendered-manifests.yaml
 
       - name: 5. Run Trivy Kubernetes Manifest Misconfiguration Scan
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
           scan-ref: './helm/cloudpulse-chart'
