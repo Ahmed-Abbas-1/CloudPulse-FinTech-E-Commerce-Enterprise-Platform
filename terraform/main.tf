@@ -30,7 +30,7 @@ variable "github_org_or_user" {
 variable "github_repo_name" {
   type        = string
   description = "The application repository name"
-  default     = "cloudpulse-microservices"
+  default     = "CloudPulse FinTech & E-Commerce Enterprise Platform"
 }
 
 variable "microservices" {
