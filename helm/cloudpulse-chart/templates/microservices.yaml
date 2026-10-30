@@ -1,0 +1,232 @@
+# 1. Auth Gateway Service & Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-gateway
+  labels:
+    app: auth-gateway
+spec:
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  selector:
+    app: auth-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-gateway
+spec:
+  replicas: {{ .Values.authGateway.replicas }}
+  selector:
+    matchLabels:
+      app: auth-gateway
+  template:
+    metadata:
+      labels:
+        app: auth-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.global.imagePullSecret }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: auth-gateway
+          image: "{{ .Values.global.awsAccountId }}.dkr.ecr.{{ .Values.global.awsRegion }}.amazonaws.com/cloudpulse/auth-gateway:{{ .Values.authGateway.tag }}"
+          ports:
+            - containerPort: 8000
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: cloudpulse-app-secrets
+                  key: JWT_SECRET
+            - name: CATALOG_SERVICE_URL
+              value: "http://catalog-service:8081"
+            - name: ORDER_SERVICE_URL
+              value: "http://order-service:8082"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+# 2. Catalog Service & Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  labels:
+    app: catalog-service
+spec:
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
+  selector:
+    app: catalog-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+spec:
+  replicas: {{ .Values.catalogService.replicas }}
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.global.imagePullSecret }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: catalog-service
+          image: "{{ .Values.global.awsAccountId }}.dkr.ecr.{{ .Values.global.awsRegion }}.amazonaws.com/cloudpulse/catalog-service:{{ .Values.catalogService.tag }}"
+          ports:
+            - containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+---
+# 3. Notification Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-worker
+spec:
+  replicas: {{ .Values.notificationWorker.replicas }}
+  selector:
+    matchLabels:
+      app: notification-worker
+  template:
+    metadata:
+      labels:
+        app: notification-worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/metrics"
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.global.imagePullSecret }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: notification-worker
+          image: "{{ .Values.global.awsAccountId }}.dkr.ecr.{{ .Values.global.awsRegion }}.amazonaws.com/cloudpulse/notification-worker:{{ .Values.notificationWorker.tag }}"
+          ports:
+            - containerPort: 8083
+          env:
+            - name: RABBITMQ_URL
+              value: "amqp://guest:guest@rabbitmq:5672"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+---
+# 4. Frontend UI Service & Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-ui
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: frontend-ui
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-ui
+spec:
+  replicas: {{ .Values.frontendUi.replicas }}
+  selector:
+    matchLabels:
+      app: frontend-ui
+  template:
+    metadata:
+      labels:
+        app: frontend-ui
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.global.imagePullSecret }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+      containers:
+        - name: frontend-ui
+          image: "{{ .Values.global.awsAccountId }}.dkr.ecr.{{ .Values.global.awsRegion }}.amazonaws.com/cloudpulse/frontend-ui:{{ .Values.frontendUi.tag }}"
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

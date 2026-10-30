@@ -1,0 +1,30 @@
+global:
+  awsAccountId: "624052199701"
+  awsRegion: "us-east-1"
+  imagePullSecret: "ecr-registry-secret"
+  storageClass: "longhorn"
+  domain: "cloudpulse.local"
+
+authGateway:
+  tag: "v1.0.0"
+  replicas: 2
+
+catalogService:
+  tag: "v1.0.0"
+  replicas: 2
+
+orderService:
+  tag: "v1.0.0"
+  versionLabel: "v1.0.0-stable"
+  replicas: 2
+
+notificationWorker:
+  tag: "v1.0.0"
+  replicas: 1
+
+frontendUi:
+  tag: "v1.0.0"
+  replicas: 2
+
+database:
+  storageSize: "2Gi"

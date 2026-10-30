@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cloudpulse-enterprise-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "cloudpulse-ca-issuer"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{ .Values.global.domain }}
+      secretName: cloudpulse-tls-cert
+  rules:
+    - host: {{ .Values.global.domain }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-gateway
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-ui
+                port:
+                  number: 8080

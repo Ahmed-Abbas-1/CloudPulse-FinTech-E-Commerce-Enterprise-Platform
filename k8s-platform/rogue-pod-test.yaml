@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hacker-rogue-pod
+  namespace: cloudpulse-prod
+  labels:
+    app: rogue-test
+spec:
+  containers:
+    - name: hacker-shell
+      image: nginx:latest

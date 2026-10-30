@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudPulse | Enterprise FinTech & Cloud-Native Platform</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #111827;
+      --border: #1f2937;
+      --primary: #3b82f6;
+      --accent: #10b981;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+    .brand { font-size: 24px; font-weight: 700; color: #60a5fa; }
+    .badge { background: #065f46; color: #34d399; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; border: 1px solid #059669; }
+    .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .card h3 { margin-bottom: 14px; font-size: 18px; color: #93c5fd; }
+    input, button { width: 100%; padding: 10px 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid var(--border); background: #1e293b; color: white; }
+    button { background: var(--primary); border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    button:hover { opacity: 0.9; }
+    .product-item, .order-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--border); }
+    .canary-tag { background: #312e81; color: #a5b4fc; padding: 3px 8px; border-radius: 6px; font-size: 12px; }
+    .status-box { font-family: monospace; font-size: 13px; color: #34d399; margin-top: 8px; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">CloudPulse Enterprise Platform</div>
+      <div style="color: var(--muted); font-size: 14px;">Hybrid-Cloud DevSecOps | GitOps | Zero-Trust | Canary Delivery</div>
+    </div>
+    <div id="canaryBadge" class="badge">Order Engine: Checking...</div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h3>1. Zero-Trust JWT Authentication (FastAPI)</h3>
+        <input id="username" value="admin" placeholder="Username" />
+        <input id="password" type="password" value="cloudpulse2026" placeholder="Password" />
+        <button onclick="login()">Authenticate & Issue JWT</button>
+        <div id="authStatus" class="status-box">Not authenticated</div>
+      </div>
+
+      <div class="card">
+        <h3>2. Architecture Telemetry</h3>
+        <p style="font-size: 14px; color: var(--muted); line-height: 1.6;">
+          • <b>Gateway:</b> Python FastAPI + JWT<br/>
+          • <b>Catalog:</b> Golang Distroless Microservice<br/>
+          • <b>Orders:</b> Node.js + PostgreSQL (Longhorn CSI)<br/>
+          • <b>Async Queue:</b> RabbitMQ + Python Worker
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h3>3. Enterprise Product Catalog (Golang Service)</h3>
+        <div id="catalogList">Loading catalog...</div>
+      </div>
+
+      <div class="card">
+        <h3>4. Live PostgreSQL Orders & Canary Routing</h3>
+        <div id="ordersList">Loading orders...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let jwtToken = "";
+
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        jwtToken = data.access_token;
+        document.getElementById("authStatus").innerText = "JWT Issued: " + jwtToken.substring(0, 36) + "...";
+      } else {
+        document.getElementById("authStatus").innerText = "Auth Failed: " + JSON.stringify(data);
+      }
+    }
+
+    async function loadCatalog() {
+      const res = await fetch("/api/catalog");
+      const data = await res.json();
+      const container = document.getElementById("catalogList");
+      container.innerHTML = "";
+      (data.products || []).forEach(p => {
+        container.innerHTML += `
+          <div class="product-item">
+            <div>
+              <strong>${p.name}</strong> <span class="canary-tag">${p.id}</span>
+              <div style="font-size:12px; color:#9ca3af;">${p.category} | Stock: ${p.stock}</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <strong>$${p.price}</strong>
+              <button style="width:auto; margin:0; padding:8px 14px; background:#10b981;" onclick="buyProduct('${p.id}', ${p.price})">Order Now</button>
+            </div>
+          </div>`;
+      });
+    }
+
+    async function buyProduct(product_id, amount) {
+      if (!jwtToken) {
+        await login();
+      }
+      await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + jwtToken
+        },
+        body: JSON.stringify({ product_id, quantity: 1, amount })
+      });
+      await loadOrders();
+    }
+
+    async function loadOrders() {
+      const res = await fetch("/api/orders");
+      const data = await res.json();
+      if (data.canary_version) {
+        document.getElementById("canaryBadge").innerText = "Active Order Engine: " + data.canary_version;
+      }
+      const container = document.getElementById("ordersList");
+      container.innerHTML = "";
+      (data.orders || []).forEach(o => {
+        container.innerHTML += `
+          <div class="order-item">
+            <div>
+              <strong>Order #${o.id}</strong> — Product: <b>${o.product_id}</b> ($${o.amount})
+              <div style="font-size:12px; color:#9ca3af;">User: ${o.username} | ${o.created_at}</div>
+            </div>
+            <span class="canary-tag">${o.processed_by_version}</span>
+          </div>`;
+      });
+    }
+
+    loadCatalog();
+    loadOrders();
+  </script>
+</body>
+</html>

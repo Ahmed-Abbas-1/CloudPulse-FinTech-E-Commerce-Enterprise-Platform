@@ -1,0 +1,31 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: cloudpulse-selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cloudpulse-root-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: CloudPulse Enterprise Root CA
+  secretName: cloudpulse-root-ca-secret
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: cloudpulse-selfsigned-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: cloudpulse-ca-issuer
+spec:
+  ca:
+    secretName: cloudpulse-root-ca-secret

@@ -1,0 +1,15 @@
+# Terraform local states and caches
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+
+# Vault local initialization keys
+.vault-keys.json
+**/.vault-keys.json
+
+# OS and Editor files
+.DS_Store
+*.swp
+*~.vault-keys.json

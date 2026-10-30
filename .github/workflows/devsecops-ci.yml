@@ -1,0 +1,167 @@
+name: CloudPulse Enterprise DevSecOps CI & GitOps Updater
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+  security-events: write
+
+env:
+  AWS_REGION: "us-east-1"
+
+jobs:
+  # =========================================================================
+  # JOB 1: Shift-Left Security Gate (Secrets, SAST, SCA & Helm Verification)
+  # =========================================================================
+  security-quality-gate:
+    name: "Gate 1: Secret, SAST, SCA & IaC Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 1. Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 2. Run Semgrep SAST Scan (Python, Go, Node.js)
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/python
+            p/golang
+            p/nodejs
+
+      - name: 3. Run Trivy FileSystem SCA Scan (Dependencies)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          scan-ref: './services'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: 4. Lint & Validate Enterprise Helm Chart
+        run: |
+          helm lint ./helm/cloudpulse-chart
+          helm template cloudpulse ./helm/cloudpulse-chart > /tmp/rendered-manifests.yaml
+
+      - name: 5. Run Trivy Kubernetes Manifest Misconfiguration Scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'config'
+          scan-ref: './helm/cloudpulse-chart'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+  # =========================================================================
+  # JOB 2: Build, Scan, Sign (Cosign) & Push to AWS ECR via Keyless OIDC
+  # =========================================================================
+  build-scan-sign-push:
+    name: "Gate 2: Build, Scan & Sign (${{ matrix.service }})"
+    needs: security-quality-gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-gateway
+          - catalog-service
+          - order-service
+          - notification-worker
+          - frontend-ui
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via Keyless OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Install Cosign for Container Signing
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Build Multi-Stage Docker Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          SHORT_TAG="v1.0.${{ github.run_number }}"
+          docker build -t $REGISTRY/cloudpulse/${{ matrix.service }}:$SHORT_TAG ./services/${{ matrix.service }}
+
+      - name: Scan Built Docker Image with Trivy
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          SHORT_TAG="v1.0.${{ github.run_number }}"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasecurity/trivy:latest image \
+            --format table \
+            --exit-code 0 \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            $REGISTRY/cloudpulse/${{ matrix.service }}:$SHORT_TAG
+
+      - name: Push Verified Image to Amazon ECR
+        id: push-image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          SHORT_TAG="v1.0.${{ github.run_number }}"
+          docker push $REGISTRY/cloudpulse/${{ matrix.service }}:$SHORT_TAG
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/cloudpulse/${{ matrix.service }}:$SHORT_TAG)
+          echo "image_digest=$DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Cryptographically Sign Container Image with Cosign (Keyless OIDC)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign --yes ${{ steps.push-image.outputs.image_digest }}
+
+  # =========================================================================
+  # JOB 3: Automated GitOps Manifest Updater (Updates Helm values.yaml)
+  # =========================================================================
+  gitops-manifest-update:
+    name: "Gate 3: GitOps Manifest Auto-Update"
+    needs: build-scan-sign-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository on Main Branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Image Tags in Helm values.yaml
+        run: |
+          NEW_TAG="v1.0.${{ github.run_number }}"
+          sed -i "s/tag: \".*\"/tag: \"${NEW_TAG}\"/g" ./helm/cloudpulse-chart/values.yaml
+          sed -i "s/versionLabel: \".*\"/versionLabel: \"${NEW_TAG}-canary\"/g" ./helm/cloudpulse-chart/values.yaml
+
+      - name: Commit and Push Updated Helm Values for ArgoCD
+        run: |
+          git config user.name "cloudpulse-gitops-bot"
+          git config user.email "gitops-bot@cloudpulse.local"
+          git add ./helm/cloudpulse-chart/values.yaml
+          git diff --staged --quiet || git commit -m "chore(gitops): promote release v1.0.${{ github.run_number }} [skip ci]"
+          git push origin main

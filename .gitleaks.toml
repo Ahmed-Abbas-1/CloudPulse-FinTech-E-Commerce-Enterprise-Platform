@@ -1,0 +1,8 @@
+title = "CloudPulse Enterprise Gitleaks Configuration"
+
+[allowlist]
+description = "Ignore documentation screenshots and public Helm templates"
+paths = [
+  '''docs/screenshots/.*''',
+  '''helm/cloudpulse-chart/templates/external-secret\.yaml'''
+]

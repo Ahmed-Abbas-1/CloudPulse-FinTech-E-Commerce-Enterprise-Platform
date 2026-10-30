@@ -1,0 +1,101 @@
+# 1. Default Deny All Ingress Traffic in Production Namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# 2. Allow NGINX Ingress Controller & Prometheus to reach Frontend and Auth Gateway
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-ingress-and-metrics
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - frontend-ui
+          - auth-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+---
+# 3. Allow ONLY Auth Gateway (and Prometheus) to reach Catalog and Order Services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-backend-services
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - catalog-service
+          - order-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: auth-gateway
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+---
+# 4. Strict Database Isolation: ONLY order-service can reach PostgreSQL on port 5432
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgresql-zero-trust-isolation
+spec:
+  podSelector:
+    matchLabels:
+      app: postgresql
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: order-service
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# 5. Strict Message Broker Isolation: ONLY order-service and notification-worker can reach RabbitMQ
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-zero-trust-isolation
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - order-service
+                  - notification-worker
+      ports:
+        - protocol: TCP
+          port: 5672

@@ -1,0 +1,99 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-root-microservices
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: check-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - cloudpulse-prod
+      exclude:
+        any:
+          - resources:
+              selector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - postgresql
+                      - redis
+                      - rabbitmq
+          - resources:
+              names:
+                - "ecr-registry-helper*"
+                - "initial-ecr-sync*"
+      validate:
+        message: "Enterprise Security Policy Violation: Running as root is strictly prohibited. Set securityContext.runAsNonRoot to true."
+        pattern:
+          spec:
+            securityContext:
+              runAsNonRoot: true
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-pod-resource-limits
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - cloudpulse-prod
+      exclude:
+        any:
+          - resources:
+              names:
+                - "ecr-registry-helper*"
+                - "initial-ecr-sync*"
+      validate:
+        message: "Enterprise Governance Violation: Every container in production must define CPU and memory limits."
+        pattern:
+          spec:
+            containers:
+              - name: "*"
+                resources:
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: prevent-latest-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - cloudpulse-prod
+      exclude:
+        any:
+          - resources:
+              names:
+                - "ecr-registry-helper*"
+                - "initial-ecr-sync*"
+      validate:
+        message: "Enterprise Traceability Violation: Using mutable ':latest' image tag is forbidden in production."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
