@@ -110,18 +110,16 @@ jobs:
           docker build -t $REGISTRY/cloudpulse/${{ matrix.service }}:$SHORT_TAG ./services/${{ matrix.service }}
 
       - name: Scan Built Docker Image with Trivy
+        uses: aquasecurity/trivy-action@master
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          SHORT_TAG="v1.0.${{ github.run_number }}"
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasecurity/trivy:0.48.3 image \
-            --format table \
-            --exit-code 0 \
-            --ignore-unfixed \
-            --severity CRITICAL,HIGH \
-            $REGISTRY/cloudpulse/${{ matrix.service }}:$SHORT_TAG
-
+        with:
+          image-ref: '${{ env.REGISTRY }}/cloudpulse/${{ matrix.service }}:v1.0.${{ github.run_number }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
       - name: Push Verified Image to Amazon ECR
         id: push-image
         env:
