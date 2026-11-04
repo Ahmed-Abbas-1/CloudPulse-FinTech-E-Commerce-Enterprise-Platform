@@ -172,10 +172,10 @@ The platform is deployed across a 3-Node Ubuntu Linux `kubeadm` cluster networke
 
 | Hostname | Cluster Role | IP Address | OS / Kernel | Provisioned Components |
 | :--- | :--- | :--- | :--- | :--- |
-| **`k8s-master-01`** | Control Plane + Bastion | `192.168.1.10` | Ubuntu 22.04 / 24.04 LTS | `kube-apiserver`, `etcd`, Terraform, Ansible, Helm, AWS CLI |
-| **`k8s-worker-01`** | Compute & Storage Worker 1 | `192.168.1.11` | Ubuntu 22.04 / 24.04 LTS | Polyglot Microservices, Stateful Workloads, Promtail, Calico |
-| **`k8s-worker-02`** | Compute & Storage Worker 2 | `192.168.1.12` | Ubuntu 22.04 / 24.04 LTS | Polyglot Microservices, Observability Stack, Longhorn CSI |
-| **MetalLB VIP Pool** | Virtual LoadBalancer IPs | `192.168.1.200 - 220` | L2 ARP Broadcast | External IP allocation for `ingress-nginx-controller` |
+| **`k8s-master-01`** | Control Plane + Bastion | `192.168.92.129` | Ubuntu 22.04 / 24.04 LTS | `kube-apiserver`, `etcd`, Terraform, Ansible, Helm, AWS CLI |
+| **`k8s-worker-01`** | Compute & Storage Worker 1 | `192.168.92.132` | Ubuntu 22.04 / 24.04 LTS | Polyglot Microservices, Stateful Workloads, Promtail, Calico |
+| **`k8s-worker-02`** | Compute & Storage Worker 2 | `192.168.92.133` | Ubuntu 22.04 / 24.04 LTS | Polyglot Microservices, Observability Stack, Longhorn CSI |
+| **MetalLB VIP Pool** | Virtual LoadBalancer IPs | `192.168.92.200 - 220` | L2 ARP Broadcast | External IP allocation for `ingress-nginx-controller` |
 
 ### 🛠️ Required CLI Tools & Cloud Accounts
 - **Active AWS Account** with permissions to provision ECR, S3, and IAM OIDC resources
@@ -473,11 +473,14 @@ Engineered a 3-Gate automated workflow executing Gitleaks, Semgrep SAST, Trivy S
 #### Stage 18: Keyless AWS OIDC, Trivy Image Scanning & Cosign Verification Logs
 Verified detailed execution logs confirming temporary AWS STS credential assumption via OIDC, zero unfixed critical vulnerabilities in Trivy, and keyless container signing via Sigstore Cosign.
 <p align="center">
-  <img src="docs/screenshots/18-trivy-semgrep-cosign-logs.png" width="90%">
+  <img src="docs/screenshots/18-trivy-semgrep-cosign-logs.png-part1" width="45%">
+  &nbsp; &nbsp;
+  <img src="docs/screenshots/18-trivy-semgrep-cosign-logs.png-part2" width="45%">
   <br>
   <em><b>Figure 19:</b> CI execution logs demonstrating Shift-Left security scanning, keyless OIDC authentication, and Cosign signing.</em>
 </p>
 
+<hr>
 #### Stage 19: Cryptographic Supply-Chain Signatures in Amazon ECR
 Confirmed that Sigstore Cosign cryptographic signature artifacts (`.sig`) are stored alongside the immutable microservice container images inside Amazon ECR.
 <p align="center">
@@ -693,7 +696,7 @@ Operating a multi-layered Hybrid-Cloud DevSecOps platform on a 3-node bare-metal
 <div align="center">
   <h3>🏗️ Architected & Deployed by</h3>
   <h2>Ahmed Mohamed Abbas Bahij</h2>
-  <p><b>Cloud Infrastructure & DevOps Engineer | AWS Certified Solutions Architect</b></p>
+  <p><b>Cloud Infrastructure & DevOps Engineer </b></p>
 
   <a href="https://www.linkedin.com/in/ahmedabbas99" target="_blank">
     <img src="https://img.shields.io/badge/LinkedIn-Connect_Profile-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn Profile" />
