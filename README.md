@@ -473,9 +473,9 @@ Engineered a 3-Gate automated workflow executing Gitleaks, Semgrep SAST, Trivy S
 #### Stage 18: Keyless AWS OIDC, Trivy Image Scanning & Cosign Verification Logs
 Verified detailed execution logs confirming temporary AWS STS credential assumption via OIDC, zero unfixed critical vulnerabilities in Trivy, and keyless container signing via Sigstore Cosign.
 <p align="center">
-  <img src="docs/screenshots/18-trivy-semgrep-cosign-logs.png-part1" width="45%">
+  <img src="docs/screenshots/18-trivy-semgrep-cosign-logs-part1.png" width="45%">
   &nbsp; &nbsp;
-  <img src="docs/screenshots/18-trivy-semgrep-cosign-logs.png-part2" width="45%">
+  <img src="docs/screenshots/18-trivy-semgrep-cosign-logs-part2.png" width="45%">
   <br>
   <em><b>Figure 19:</b> CI execution logs demonstrating Shift-Left security scanning, keyless OIDC authentication, and Cosign signing.</em>
 </p>
